@@ -48,6 +48,8 @@ def create_transform_matrix(x, y, s_x, s_y):
     return np.float32([[s_x, 0, x], [0, s_y, y]])
 
 def get_model_dir(m):
+    if os.path.exists(os.path.join("/stable-diffusion-cache/models", m)):
+        return os.path.join("/stable-diffusion-cache/models", m)
     try:
         return folder_paths.get_folder_paths(m)[0]
     except:
@@ -208,7 +210,7 @@ class LP_Engine:
 
     def get_detect_model(self):
         if self.detect_model == None:
-            model_dir = get_model_dir("ultralytics")
+            model_dir = get_model_dir("adetailer")
             if not os.path.exists(model_dir): os.mkdir(model_dir)
             model_path = os.path.join(model_dir, "face_yolov8n.pt")
             if not os.path.exists(model_path):
