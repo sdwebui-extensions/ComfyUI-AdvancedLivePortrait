@@ -1,15 +1,9 @@
-import os.path as osp
 import numpy as np
-import cv2
 import torch
-import yaml
 
-from .utils.timer import Timer
 from .utils.helper import concat_feat
 from .utils.camera import headpose_pred_to_degree, get_rotation_matrix
 from .config.inference_config import InferenceConfig
-from .utils.rprint import rlog as log
-
 
 class LivePortraitWrapper(object):
 
@@ -23,55 +17,13 @@ class LivePortraitWrapper(object):
         self.stitching_retargeting_module = stitching_retargeting_module
 
         self.cfg = cfg
-        self.device_id = cfg.device_id
-        self.timer = Timer()
-
-    def prepare_source(self, img: np.ndarray) -> torch.Tensor:
-        """ construct the input as standard
-        img: HxWx3, uint8, 256x256
-        """
-        h, w = img.shape[:2]
-        if h != self.cfg.input_shape[0] or w != self.cfg.input_shape[1]:
-            x = cv2.resize(img, (self.cfg.input_shape[0], self.cfg.input_shape[1]))
-        else:
-            x = img.copy()
-
-        if x.ndim == 3:
-            x = x[np.newaxis].astype(np.float32) / 255.  # HxWx3 -> 1xHxWx3, normalized to 0~1
-        elif x.ndim == 4:
-            x = x.astype(np.float32) / 255.  # BxHxWx3, normalized to 0~1
-        else:
-            raise ValueError(f'img ndim should be 3 or 4: {x.ndim}')
-        x = np.clip(x, 0, 1)  # clip to 0~1
-        x = torch.from_numpy(x).permute(0, 3, 1, 2)  # 1xHxWx3 -> 1x3xHxW
-        x = x.cuda(self.device_id)
-        return x
-
-    def prepare_driving_videos(self, imgs) -> torch.Tensor:
-        """ construct the input as standard
-        imgs: NxBxHxWx3, uint8
-        """
-        if isinstance(imgs, list):
-            _imgs = np.array(imgs)[..., np.newaxis]  # TxHxWx3x1
-        elif isinstance(imgs, np.ndarray):
-            _imgs = imgs
-        else:
-            raise ValueError(f'imgs type error: {type(imgs)}')
-
-        y = _imgs.astype(np.float32) / 255.
-        y = np.clip(y, 0, 1)  # clip to 0~1
-        y = torch.from_numpy(y).permute(0, 4, 3, 1, 2)  # TxHxWx3x1 -> Tx1x3xHxW
-        y = y.cuda(self.device_id)
-
-        return y
 
     def extract_feature_3d(self, x: torch.Tensor) -> torch.Tensor:
         """ get the appearance feature of the image by F
         x: Bx3xHxW, normalized to 0~1
         """
         with torch.no_grad():
-            with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=self.cfg.flag_use_half_precision):
-                feature_3d = self.appearance_feature_extractor(x)
+            feature_3d = self.appearance_feature_extractor(x)
 
         return feature_3d.float()
 
@@ -82,8 +34,7 @@ class LivePortraitWrapper(object):
         return: A dict contains keys: 'pitch', 'yaw', 'roll', 't', 'exp', 'scale', 'kp'
         """
         with torch.no_grad():
-            with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=self.cfg.flag_use_half_precision):
-                kp_info = self.motion_extractor(x)
+            kp_info = self.motion_extractor(x)
 
             if self.cfg.flag_use_half_precision:
                 # float the dict
@@ -175,11 +126,10 @@ class LivePortraitWrapper(object):
         """
         # The line 18 in Algorithm 1: D(W(f_s; x_s, x′_d,i)）
         with torch.no_grad():
-            with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=self.cfg.flag_use_half_precision):
-                # get decoder input
-                ret_dct = self.warping_module(feature_3d, kp_source=kp_source, kp_driving=kp_driving)
-                # decode
-                ret_dct['out'] = self.spade_generator(feature=ret_dct['out'])
+            # get decoder input
+            ret_dct = self.warping_module(feature_3d, kp_source=kp_source, kp_driving=kp_driving)
+            # decode
+            ret_dct['out'] = self.spade_generator(feature=ret_dct['out'])
 
             # float the dict
             if self.cfg.flag_use_half_precision:
