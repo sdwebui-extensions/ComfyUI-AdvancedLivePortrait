@@ -12,7 +12,6 @@ import dill
 import yaml
 import random
 from torchvision import transforms
-from ultralytics import YOLO
 #import math
 #import torch.nn.functional as torchfn
 #from scipy.spatial.transform import Rotation as R
@@ -210,6 +209,7 @@ class LP_Engine:
 
     def get_detect_model(self):
         if self.detect_model == None:
+            from ultralytics import YOLO
             model_dir = get_model_dir("adetailer")
             if not os.path.exists(model_dir): os.mkdir(model_dir)
             model_path = os.path.join(model_dir, "face_yolov8n.pt")
