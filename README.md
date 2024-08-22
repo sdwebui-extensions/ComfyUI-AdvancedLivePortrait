@@ -1,5 +1,15 @@
 # ComfyUI-AdvancedLivePortrait
 
+## Update
+
+8/21/2024
+
+You can create a video without a video.
+
+Track the face of the source video.
+
+The workflow has been updated.
+
 ## Introduction
 
 AdvancedLivePortrait is faster and has real-time preview
